@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAN</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400&family=Noto+Serif+KR:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:     #111110;
+  --surf:   #191917;
+  --border: #242320;
+  --text:   #b8b3aa;
+  --dim:    #4e4a45;
+  --bright: #d4cec6;
+  --light:  #e0dbd4;
+  --panel:  #0d0d0c;
+  --name-w: 148px;
+  --row-h:  1.9rem;
+  --bar-h:  1.1rem;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; }
+body {
+  background: var(--bg);
+  /* subtle concrete formwork lines */
+  background-image: repeating-linear-gradient(
+    0deg, transparent, transparent 31px,
+    rgba(255,255,255,0.018) 31px, rgba(255,255,255,0.018) 32px
+  );
+  color: var(--text);
+  font-family: 'IBM Plex Mono', 'Noto Serif KR', monospace;
+  font-weight: 300;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+/* HEADER */
+header {
+  position: sticky; top: 0; z-index: 40;
+  background: var(--bg);
+  background-image: inherit;
+  border-bottom: 1px solid var(--border);
+  padding: 1.1rem 1.4rem 0.95rem;
+  display: flex; align-items: center; gap: 1.5rem;
+}
+.h-title {
+  font-family: 'Noto Serif KR', serif;
+  font-weight: 300; font-size: 1rem;
+  color: var(--light);
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+}
+.h-divider {
+  width: 24px; height: 1px;
+  background: var(--dim); flex-shrink: 0;
+}
+.h-sub {
+  font-size: 0.52rem; color: var(--dim);
+  letter-spacing: 0.22em; text-transform: uppercase;
+}
+.name-toggle {
+  margin-left: auto;
+  background: none; border: 1px solid var(--border);
+  color: var(--dim); border-radius: 0;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.52rem; letter-spacing: 0.12em;
+  padding: 0.3rem 0.6rem; cursor: pointer;
+  transition: border-color 0.1s, color 0.1s; white-space: nowrap;
+}
+.name-toggle:hover { border-color: var(--dim); color: var(--text); }
+.name-toggle.on { border-color: var(--text); color: var(--light); }
+
+/* SCROLL */
+.scroll-wrap {
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  padding-bottom: 5rem;
+}
+
+.tl { border-collapse: collapse; table-layout: fixed; }
+.tl td { padding: 0; }
+
+/* name column — hidden by default */
+.col-name {
+  position: sticky; left: 0; z-index: 6;
+  background: var(--bg);
+  width: var(--name-w); min-width: var(--name-w);
+  border-right: 1px solid var(--border);
+}
+.tl:not(.show-names) .col-name { display: none; }
+
+/* RULER */
+.ruler-name { height: 2rem; border-bottom: 1px solid var(--border); }
+.ruler-cell  { position: relative; height: 2rem; border-bottom: 1px solid var(--border); }
+.tick { position: absolute; top: 0; display: flex; flex-direction: column; align-items: center; }
+.tick-line { width: 1px; height: 7px; background: var(--border); }
+.tick-lbl {
+  font-size: 0.48rem; color: var(--dim);
+  margin-top: 2px; white-space: nowrap; letter-spacing: 0.05em;
+}
+
+/* PERSON ROWS */
+.row-name {
+  height: var(--row-h);
+  border-bottom: 1px solid rgba(255,255,255,0.014);
+  vertical-align: middle;
+  padding: 0 0.7rem 0 0.9rem; cursor: pointer;
+}
+.row-name-txt {
+  font-family: 'Noto Serif KR', serif;
+  font-weight: 300; font-size: 0.7rem; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: color 0.1s; letter-spacing: 0.04em;
+}
+.row-name-txt:hover { color: var(--bright); }
+.row-name-txt.active { color: var(--light); }
+
+.row-bar {
+  position: relative;
+  height: var(--row-h);
+  border-bottom: 1px solid rgba(255,255,255,0.014);
+}
+.bar {
+  position: absolute;
+  top: 50%; transform: translateY(-50%);
+  height: var(--bar-h);
+  border-radius: 0;           /* concrete — no radius */
+  cursor: pointer;
+  display: flex; align-items: center;
+  padding: 0 0.4rem; overflow: hidden;
+  min-width: 3px; opacity: 0.72;
+  transition: opacity 0.1s;
+}
+.bar:hover { opacity: 0.95; }
+.bar.active { opacity: 1; outline: 1px solid var(--light); outline-offset: 2px; }
+.bar.alive {
+  /* dashed right edge: right border only */
+  border-right: 2px dashed rgba(255,255,255,0.28);
+}
+.bar-lbl {
+  font-size: 0.6rem; color: rgba(255,255,255,0.82);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none; letter-spacing: 0.04em;
+  font-family: 'Noto Serif KR', serif; font-weight: 300;
+}
+
+/* OVERLAY */
+.overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6); z-index: 100;
+}
+.overlay.open { display: block; }
+
+/* PANEL */
+.panel {
+  position: fixed; top: 0; right: -380px;
+  width: 340px; max-width: 100vw; height: 100dvh;
+  background: var(--panel); border-left: 1px solid var(--border);
+  z-index: 101; transition: right 0.24s ease;
+  display: flex; flex-direction: column;
+}
+.panel.open { right: 0; }
+
+@media (max-width: 600px) {
+  .panel {
+    top: auto; right: 0; bottom: -80vh;
+    width: 100%; height: 74vh;
+    border-left: none; border-top: 1px solid var(--border);
+    border-radius: 0;
+    transition: bottom 0.24s ease;
+  }
+  .panel.open { bottom: 0; right: 0; }
+}
+
+/* thin top accent line on panel */
+.panel::before {
+  content: ''; display: block; flex-shrink: 0;
+  height: 2px; background: var(--dim);
+}
+
+.panel-head {
+  flex-shrink: 0;
+  padding: 1.2rem 1.3rem 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-start; justify-content: space-between;
+}
+.ph-name {
+  font-family: 'Noto Serif KR', serif; font-weight: 300;
+  font-size: 1.15rem; color: var(--light);
+  line-height: 1.3; letter-spacing: 0.06em;
+}
+.ph-nat {
+  font-size: 0.5rem; color: var(--dim);
+  margin-top: 0.2rem; letter-spacing: 0.14em; text-transform: uppercase;
+}
+.ph-dates {
+  font-size: 0.62rem; color: var(--text);
+  margin-top: 0.35rem; letter-spacing: 0.1em;
+}
+.ph-age {
+  font-size: 0.52rem; color: var(--dim); margin-top: 0.12rem;
+  letter-spacing: 0.08em;
+}
+.close-btn {
+  background: none; border: none;
+  color: var(--dim); font-size: 0.9rem;
+  cursor: pointer; padding: 0.1rem 0.2rem; line-height: 1; flex-shrink: 0;
+}
+.close-btn:hover { color: var(--text); }
+
+.panel-body {
+  flex: 1; overflow-y: auto;
+  padding: 1.2rem 1.3rem;
+  display: flex; flex-direction: column; gap: 1.2rem;
+}
+.flabel {
+  font-size: 0.5rem; color: var(--dim);
+  text-transform: uppercase; letter-spacing: 0.22em;
+  margin-bottom: 0.5rem;
+}
+.memo-view {
+  font-family: 'Noto Serif KR', serif; font-weight: 300;
+  font-size: 0.84rem; line-height: 1.85; color: var(--text);
+  min-height: 2.5rem; white-space: pre-wrap;
+}
+.memo-edit {
+  display: none; width: 100%;
+  background: var(--surf); border: 1px solid var(--border);
+  border-radius: 0; color: var(--text);
+  font-family: 'Noto Serif KR', serif; font-weight: 300;
+  font-size: 0.82rem; line-height: 1.85;
+  padding: 0.6rem 0.65rem; resize: vertical; min-height: 110px; outline: none;
+}
+.memo-edit:focus { border-color: var(--dim); }
+
+.pactions { margin-top: auto; display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
+.btn {
+  padding: 0.38rem 0.8rem; border-radius: 0;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.56rem; letter-spacing: 0.1em;
+  cursor: pointer; border: none; transition: all 0.1s;
+  text-transform: uppercase;
+}
+.btn-primary { background: var(--text); color: var(--panel); }
+.btn-primary:hover { background: var(--bright); }
+.btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--dim); }
+.btn-ghost:hover { border-color: var(--dim); color: var(--text); }
+.btn-del { background: transparent; border: 1px solid #3a2020; color: #6a4040; margin-left: auto; }
+.btn-del:hover { border-color: #6a4040; color: #9a6060; }
+
+/* FAB */
+.fab {
+  position: fixed; bottom: 1.4rem; right: 1.4rem;
+  width: 2.5rem; height: 2.5rem; border-radius: 0;
+  background: var(--text); color: var(--panel);
+  border: none; font-size: 1.2rem; font-weight: 300;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  z-index: 99; transition: background 0.1s; line-height: 1;
+}
+.fab:hover { background: var(--bright); }
+
+/* ADD MODAL */
+.add-wrap { display: none; position: fixed; inset: 0; z-index: 200; align-items: center; justify-content: center; padding: 1rem; background: rgba(0,0,0,0.72); }
+.add-wrap.open { display: flex; }
+.add-box {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 0; padding: 1.4rem;
+  width: 100%; max-width: 360px;
+  display: flex; flex-direction: column; gap: 0.9rem;
+  border-top: 2px solid var(--dim);
+}
+.add-title { font-family: 'Noto Serif KR', serif; font-weight: 300; font-size: 0.9rem; color: var(--light); letter-spacing: 0.2em; text-transform: uppercase; }
+.frow { display: flex; flex-direction: column; gap: 0.28rem; }
+.frow2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem; }
+.finput {
+  background: var(--surf); border: 1px solid var(--border); border-radius: 0;
+  color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 0.74rem;
+  padding: 0.44rem 0.6rem; outline: none; width: 100%;
+}
+.finput:focus { border-color: var(--dim); }
+.fhint { font-size: 0.5rem; color: var(--dim); letter-spacing: 0.05em; }
+.add-actions { display: flex; gap: 0.4rem; justify-content: flex-end; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="h-title">MAN</div>
+  <div class="h-divider"></div>
+  <div class="h-sub">timeline</div>
+  <button class="name-toggle" id="name-toggle">show names</button>
+</header>
+
+<div class="scroll-wrap">
+  <table class="tl" id="tl">
+    <thead>
+      <tr>
+        <td class="col-name ruler-name"></td>
+        <td class="ruler-cell" id="ruler"></td>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<div class="overlay" id="overlay"></div>
+
+<div class="panel" id="panel">
+  <div class="panel-head">
+    <div>
+      <div class="ph-name" id="ph-name"></div>
+      <div class="ph-nat" id="ph-nat"></div>
+      <div class="ph-dates" id="ph-dates"></div>
+      <div class="ph-age" id="ph-age"></div>
+    </div>
+    <button class="close-btn" id="close-btn">✕</button>
+  </div>
+  <div class="panel-body">
+    <div>
+      <div class="flabel">note</div>
+      <div class="memo-view" id="memo-view"></div>
+      <textarea class="memo-edit" id="memo-edit" placeholder="write a note…"></textarea>
+    </div>
+    <div class="pactions">
+      <button class="btn btn-ghost" id="edit-btn">edit</button>
+      <button class="btn btn-primary" id="save-btn" style="display:none">save</button>
+      <button class="btn btn-ghost" id="cancel-btn" style="display:none">cancel</button>
+      <button class="btn btn-del" id="del-btn">remove</button>
+    </div>
+  </div>
+</div>
+
+<div class="add-wrap" id="add-wrap">
+  <div class="add-box">
+    <div class="add-title">add figure</div>
+    <div class="frow">
+      <div class="flabel">name</div>
+      <input class="finput" id="f-name" type="text" placeholder="name">
+    </div>
+    <div class="frow2">
+      <div class="frow">
+        <div class="flabel">born</div>
+        <input class="finput" id="f-born" type="number" placeholder="1817">
+        <div class="fhint">negative for BC, e.g. -384</div>
+      </div>
+      <div class="frow">
+        <div class="flabel">died</div>
+        <input class="finput" id="f-died" type="number" placeholder="leave blank if living">
+      </div>
+    </div>
+    <div class="frow">
+      <div class="flabel">note (optional)</div>
+      <textarea class="finput" id="f-memo" rows="3" style="resize:vertical" placeholder="why you admire this person"></textarea>
+    </div>
+    <div class="add-actions">
+      <button class="btn btn-ghost" id="ac-btn">cancel</button>
+      <button class="btn btn-primary" id="as-btn">add</button>
+    </div>
+  </div>
+</div>
+
+<button class="fab" id="fab">+</button>
+
+<script>
+const NOW = 2026;
+
+// concrete slab tones — muted, close in value, like poured at different depths
+const COLORS = [
+  '#5e5a56', '#4e5458', '#585e52', '#545058',
+  '#505856', '#5a5650', '#4e5654', '#585452'
+];
+
+const DEFAULTS = [
+  {id:1,  name:"Socrates",         born:-470, died:-399, alive:false, bornFull:"c. 470 BC",    diedFull:"399 BC",        nat:"Greek",                               memo:""},
+  {id:2,  name:"Marcus Aurelius",  born:121,  died:180,  alive:false, bornFull:"Apr 26, 121",  diedFull:"Mar 17, 180",   nat:"Roman",                               memo:"Roman emperor, Stoic philosopher. Meditations — a private journal never meant to be read."},
+  {id:3,  name:"Erich Fromm",      born:1900, died:1980, alive:false, bornFull:"Mar 23, 1900", diedFull:"Mar 18, 1980",  nat:"German · American",                   memo:""},
+  {id:4,  name:"Olav H. Hauge",    born:1908, died:1994, alive:false, bornFull:"Aug 18, 1908", diedFull:"May 26, 1994",  nat:"Norwegian",                           memo:""},
+  {id:5,  name:"Richard Feynman",  born:1918, died:1988, alive:false, bornFull:"May 11, 1918", diedFull:"Feb 15, 1988",  nat:"American",                            memo:""},
+  {id:6,  name:"Frank Herbert",    born:1920, died:1986, alive:false, bornFull:"Oct 8, 1920",  diedFull:"Feb 11, 1986",  nat:"American",                            memo:""},
+  {id:7,  name:"Charlie Munger",   born:1924, died:2023, alive:false, bornFull:"Jan 1, 1924",  diedFull:"Nov 28, 2023",  nat:"American",                            memo:""},
+  {id:8,  name:"Chet Baker",       born:1929, died:1988, alive:false, bornFull:"Dec 23, 1929", diedFull:"May 13, 1988",  nat:"American",                            memo:""},
+  {id:9,  name:"Albert Camus",     born:1913, died:1960, alive:false, bornFull:"Nov 7, 1913",  diedFull:"Jan 4, 1960",   nat:"French · Algerian",                   memo:""},
+  {id:10, name:"Haruki Murakami",  born:1949, died:NOW,  alive:true,  bornFull:"Jan 12, 1949", diedFull:null,            nat:"Japanese",                            memo:""},
+  {id:11, name:"Steve Jobs",       born:1955, died:2011, alive:false, bornFull:"Feb 24, 1955", diedFull:"Oct 5, 2011",   nat:"American",                            memo:""},
+  {id:12, name:"홍상수",           born:1960, died:NOW,  alive:true,  bornFull:"Oct 25, 1960", diedFull:null,            nat:"Korean",                              memo:""},
+  {id:13, name:"손웅정",           born:1962, died:NOW,  alive:true,  bornFull:"Jun 16, 1962", diedFull:null,            nat:"Korean",                              memo:""},
+  {id:14, name:"오은영",           born:1965, died:NOW,  alive:true,  bornFull:"Mar 12, 1965", diedFull:null,            nat:"Korean",                              memo:""},
+  {id:15, name:"Denis Villeneuve", born:1967, died:NOW,  alive:true,  bornFull:"Oct 3, 1967",  diedFull:null,            nat:"Canadian",                            memo:""},
+  {id:16, name:"Elon Musk",        born:1971, died:NOW,  alive:true,  bornFull:"Jun 28, 1971", diedFull:null,            nat:"South African · Canadian · American", memo:""},
+  {id:17, name:"신형철",           born:1976, died:NOW,  alive:true,  bornFull:"1976",          diedFull:null,            nat:"Korean",                              memo:""},
+  {id:18, name:"민희진",           born:1979, died:NOW,  alive:true,  bornFull:"Dec 16, 1979", diedFull:null,            nat:"Korean",                              memo:""},
+  {id:19, name:"김민희",           born:1982, died:NOW,  alive:true,  bornFull:"Mar 1, 1982",  diedFull:null,            nat:"Korean",                              memo:""},
+  {id:20, name:"Adam Driver",      born:1983, died:NOW,  alive:true,  bornFull:"Nov 19, 1983", diedFull:null,            nat:"American",                            memo:""},
+  {id:21, name:"더콰이엇",         born:1985, died:NOW,  alive:true,  bornFull:"Jan 29, 1985", diedFull:null,            nat:"Korean",                              memo:""},
+  {id:22, name:"류혜영",           born:1991, died:NOW,  alive:true,  bornFull:"Mar 28, 1991", diedFull:null,            nat:"Korean",                              memo:""},
+  {id:23, name:"종현",             born:1990, died:2017, alive:false, bornFull:"Apr 8, 1990",  diedFull:"Dec 18, 2017",  nat:"Korean",                              memo:""},
+  {id:24, name:"아이유",           born:1993, died:NOW,  alive:true,  bornFull:"May 16, 1993", diedFull:null,            nat:"Korean",                              memo:""},
+  {id:25, name:"설리",             born:1994, died:2019, alive:false, bornFull:"Mar 29, 1994", diedFull:"Oct 14, 2019",  nat:"Korean",                              memo:""},
+  {id:26, name:"Saoirse Ronan",    born:1994, died:NOW,  alive:true,  bornFull:"Apr 12, 1994", diedFull:null,            nat:"Irish · American",                    memo:""},
+  {id:27, name:"수지",             born:1994, died:NOW,  alive:true,  bornFull:"Oct 10, 1994", diedFull:null,            nat:"Korean",                              memo:""},
+  {id:28, name:"김혜윤",           born:1996, died:NOW,  alive:true,  bornFull:"Nov 10, 1996", diedFull:null,            nat:"Korean",                              memo:""},
+];
+
+function loadS() { try { return JSON.parse(localStorage.getItem('zirip')||'{}'); } catch { return {}; } }
+function saveS(d) { localStorage.setItem('zirip', JSON.stringify(d)); }
+let S = loadS();
+
+function allPeople() {
+  const memos=S.memos||{}, extras=S.extras||[], deleted=S.deleted||[];
+  const base=DEFAULTS.filter(p=>!deleted.includes(p.id))
+    .map(p=>({...p, memo:memos[p.id]!==undefined?memos[p.id]:p.memo, isDefault:true}));
+  return [...base, ...extras];
+}
+
+function fmtY(y){ return y<=0?`BC ${Math.abs(y)}`:String(y); }
+
+function getRange(people){
+  const ys=people.flatMap(p=>[p.born, p.alive?NOW:p.died]);
+  const mn=Math.min(...ys), mx=Math.max(...ys);
+  const pad=Math.max(8, Math.round((mx-mn)*0.02));
+  return {min:mn-pad, max:mx+pad};
+}
+
+// density-weighted axis — modern intentionally more compressed
+function buildAxis(people, minY, maxY){
+  const N=80, segLen=(maxY-minY)/N;
+  const density=new Array(N).fill(0);
+  people.forEach(p=>{
+    const end=p.alive?NOW:p.died;
+    for(let i=0;i<N;i++){
+      const s=minY+i*segLen, e=s+segLen;
+      if(p.born<e && end>s) density[i]++;
+    }
+  });
+  const maxD=Math.max(...density,1);
+  const MIN_PX=5, MAX_PX=40; // MAX_PX reduced → modern more compressed
+  const widths=density.map(d=>MIN_PX+(MAX_PX-MIN_PX)*Math.pow(d/maxD, 0.65));
+  const cumX=[0];
+  for(let i=0;i<N;i++) cumX.push(cumX[i]+widths[i]);
+  const totalW=cumX[N];
+  function yearToX(year){
+    const c=Math.max(minY,Math.min(maxY,year));
+    const frac=(c-minY)/(maxY-minY);
+    const si=Math.min(Math.floor(frac*N),N-1);
+    const sf=(c-(minY+si*segLen))/segLen;
+    return cumX[si]+sf*widths[si];
+  }
+  return {totalW,yearToX};
+}
+
+let current=null, editing=false;
+
+function bornSortKey(p) {
+  if (!p.bornFull || p.bornFull === String(p.born) || p.bornFull.startsWith('c.')) return p.born * 10000;
+  const d = new Date(p.bornFull);
+  if (!isNaN(d)) return p.born * 10000 + (d.getMonth()+1) * 100 + d.getDate();
+  return p.born * 10000;
+}
+
+function render(){
+  const people=allPeople().sort((a,b)=>bornSortKey(a)-bornSortKey(b));
+  if(!people.length) return;
+  const {min,max}=getRange(people);
+  const {totalW,yearToX}=buildAxis(people,min,max);
+
+  document.getElementById('tl').style.minWidth=(148+totalW)+'px';
+
+  const ruler=document.getElementById('ruler');
+  ruler.style.width=totalW+'px'; ruler.innerHTML='';
+  const range=max-min;
+  let iv=range<100?10:range<300?25:range<800?50:100;
+  // collect all candidate ticks, then filter by minimum pixel spacing
+  const allTicks=[];
+  for(let y=Math.ceil(min/iv)*iv; y<=max; y+=iv) allTicks.push({y,x:yearToX(y)});
+  let lastX=-Infinity;
+  allTicks.filter(t=>{ if(t.x-lastX>=52){lastX=t.x;return true;} return false; })
+    .forEach(({y,x})=>{
+      const d=document.createElement('div');
+      d.className='tick'; d.style.left=x+'px';
+      d.innerHTML=`<div class="tick-line"></div><div class="tick-lbl">${fmtY(y)}</div>`;
+      ruler.appendChild(d);
+    });
+
+  const tbody=document.getElementById('tbody');
+  tbody.innerHTML='';
+  people.forEach((p,i)=>{
+    const color=COLORS[i%COLORS.length];
+    const end=p.alive?NOW:p.died;
+    const bL=yearToX(p.born);
+    const bW=Math.max(3,yearToX(end)-bL);
+    const isActive=current&&current.id===p.id;
+
+    const tr=document.createElement('tr');
+    const tdN=document.createElement('td');
+    tdN.className='col-name row-name';
+    tdN.innerHTML=`<div class="row-name-txt${isActive?' active':''}" data-id="${p.id}">${p.name}</div>`;
+    tdN.querySelector('.row-name-txt').addEventListener('click',()=>openPanel(p));
+
+    const tdB=document.createElement('td');
+    tdB.className='row-bar'; tdB.style.width=totalW+'px';
+    const bar=document.createElement('div');
+    bar.className='bar'+(isActive?' active':'')+(p.alive?' alive':'');
+    bar.style.cssText=`left:${bL}px;width:${bW}px;background:${color};`;
+    bar.dataset.id=p.id;
+    bar.innerHTML=`<span class="bar-lbl">${p.name}</span>`;
+    bar.addEventListener('click',()=>openPanel(p));
+
+    tdB.appendChild(bar); tr.appendChild(tdN); tr.appendChild(tdB);
+    tbody.appendChild(tr);
+  });
+}
+
+let namesVisible=false;
+document.getElementById('name-toggle').addEventListener('click',()=>{
+  namesVisible=!namesVisible;
+  document.getElementById('tl').classList.toggle('show-names',namesVisible);
+  const btn=document.getElementById('name-toggle');
+  btn.textContent=namesVisible?'hide names':'show names';
+  btn.classList.toggle('on',namesVisible);
+});
+
+function openPanel(p){
+  current=p; editing=false;
+  document.getElementById('ph-name').textContent=p.name;
+  document.getElementById('ph-nat').textContent=p.nat||'';
+  const bornDisplay = p.bornFull || fmtY(p.born);
+  const diedDisplay = p.alive ? 'present' : (p.diedFull || fmtY(p.died));
+  document.getElementById('ph-dates').textContent=`${bornDisplay}  —  ${diedDisplay}`;
+  const ageN=(p.alive?NOW:p.died)-p.born;
+  document.getElementById('ph-age').textContent=p.alive?`age ${ageN}  ·  living`:`b. ${fmtY(p.born)}  ·  aged ${ageN}`;
+  document.getElementById('memo-view').textContent=p.memo||'—';
+  document.getElementById('memo-edit').value=p.memo||'';
+  setEdit(false);
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('panel').classList.add('open');
+  document.querySelectorAll('.bar').forEach(b=>b.classList.toggle('active',+b.dataset.id===p.id));
+  document.querySelectorAll('.row-name-txt').forEach(b=>b.classList.toggle('active',+b.dataset.id===p.id));
+}
+
+function closePanel(){
+  current=null;
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('panel').classList.remove('open');
+  document.querySelectorAll('.bar,.row-name-txt').forEach(b=>b.classList.remove('active'));
+}
+
+function setEdit(on){
+  editing=on;
+  document.getElementById('memo-view').style.display=on?'none':'block';
+  document.getElementById('memo-edit').style.display=on?'block':'none';
+  document.getElementById('edit-btn').style.display=on?'none':'';
+  document.getElementById('save-btn').style.display=on?'':'none';
+  document.getElementById('cancel-btn').style.display=on?'':'none';
+}
+
+document.getElementById('overlay').addEventListener('click',()=>{if(!editing)closePanel();});
+document.getElementById('close-btn').addEventListener('click',closePanel);
+document.getElementById('edit-btn').addEventListener('click',()=>setEdit(true));
+document.getElementById('cancel-btn').addEventListener('click',()=>{
+  document.getElementById('memo-edit').value=current?.memo||''; setEdit(false);
+});
+document.getElementById('save-btn').addEventListener('click',()=>{
+  if(!current) return;
+  const m=document.getElementById('memo-edit').value;
+  current.memo=m;
+  if(!S.memos) S.memos={};
+  S.memos[current.id]=m;
+  if(!current.isDefault){
+    const ex=S.extras||[];
+    const idx=ex.findIndex(x=>x.id===current.id);
+    if(idx>=0) ex[idx].memo=m;
+    S.extras=ex;
+  }
+  saveS(S);
+  document.getElementById('memo-view').textContent=m||'—';
+  setEdit(false);
+});
+document.getElementById('del-btn').addEventListener('click',()=>{
+  if(!current) return;
+  if(!confirm(`Remove '${current.name}'?`)) return;
+  if(current.isDefault){if(!S.deleted)S.deleted=[];S.deleted.push(current.id);}
+  else S.extras=(S.extras||[]).filter(p=>p.id!==current.id);
+  saveS(S); closePanel(); render();
+});
+
+document.getElementById('fab').addEventListener('click',()=>{
+  ['f-name','f-born','f-died','f-memo'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('add-wrap').classList.add('open');
+  setTimeout(()=>document.getElementById('f-name').focus(),50);
+});
+document.getElementById('ac-btn').addEventListener('click',()=>document.getElementById('add-wrap').classList.remove('open'));
+document.getElementById('add-wrap').addEventListener('click',e=>{
+  if(e.target===document.getElementById('add-wrap')) document.getElementById('add-wrap').classList.remove('open');
+});
+document.getElementById('as-btn').addEventListener('click',()=>{
+  const name=document.getElementById('f-name').value.trim();
+  const born=parseInt(document.getElementById('f-born').value);
+  const diedRaw=document.getElementById('f-died').value.trim();
+  const memo=document.getElementById('f-memo').value.trim();
+  if(!name||isNaN(born)){alert('Name and birth year are required.');return;}
+  const alive=diedRaw===''||diedRaw==='-';
+  const died=alive?NOW:parseInt(diedRaw);
+  if(!alive&&(isNaN(died)||died<born)){alert('Check the death year.');return;}
+  const p={id:Date.now(),name,born,died,alive,memo,isDefault:false};
+  if(!S.extras) S.extras=[];
+  S.extras.push(p);
+  saveS(S);
+  document.getElementById('add-wrap').classList.remove('open');
+  render();
+  setTimeout(()=>openPanel(p),80);
+});
+
+render();
+</script>
+</body>
+</html>
